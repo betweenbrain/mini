@@ -199,10 +199,12 @@ class Model
 
 		foreach ($data as $row)
 		{
-			fputcsv($output, (array) $row);
-
 			// Delete record from tmp table
 			$this->deleteRow($row->id);
+			unset($row->id);
+
+			fputcsv($output, (array) $row);
+
 		}
 
 		fclose($output);
