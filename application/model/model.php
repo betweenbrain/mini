@@ -2,128 +2,228 @@
 
 class Model
 {
-    /**
-     * @param object $db A PDO database connection
-     */
-    function __construct($db)
-    {
-        try {
-            $this->db = $db;
-        } catch (PDOException $e) {
-            exit('Database connection could not be established.');
-        }
-    }
 
-    /**
-     * Get all songs from database
-     */
-    public function getAllSongs()
-    {
-        $sql = "SELECT id, artist, track, link FROM song";
-        $query = $this->db->prepare($sql);
-        $query->execute();
+	/**
+	 * For column name mapping
+	 *
+	 * @var null
+	 */
+	private $columnMap = null;
 
-        // fetchAll() is the PDO method that gets all result rows, here in object-style because we defined this in
-        // core/controller.php! If you prefer to get an associative array as the result, then do
-        // $query->fetchAll(PDO::FETCH_ASSOC); or change core/controller.php's PDO options to
-        // $options = array(PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC ...
-        return $query->fetchAll();
-    }
+	/**
+	 * @param object $db A PDO database connection
+	 */
+	function __construct($db)
+	{
+		try
+		{
+			$this->db = $db;
+		} catch (PDOException $e)
+		{
+			exit('Database connection could not be established.');
+		}
 
-    /**
-     * Add a song to database
-     * TODO put this explanation into readme and remove it from here
-     * Please note that it's not necessary to "clean" our input in any way. With PDO all input is escaped properly
-     * automatically. We also don't use strip_tags() etc. here so we keep the input 100% original (so it's possible
-     * to save HTML and JS to the database, which is a valid use case). Data will only be cleaned when putting it out
-     * in the views (see the views for more info).
-     * @param string $artist Artist
-     * @param string $track Track
-     * @param string $link Link
-     */
-    public function addSong($artist, $track, $link)
-    {
-        $sql = "INSERT INTO song (artist, track, link) VALUES (:artist, :track, :link)";
-        $query = $this->db->prepare($sql);
-        $parameters = array(':artist' => $artist, ':track' => $track, ':link' => $link);
+		/**
+		 * Force database table creation
+		 */
+		$sql   = "CREATE TABLE IF NOT EXISTS `tmp` (
+					`id`           INT(11) UNSIGNED NOT NULL AUTO_INCREMENT,
+					`firstName`         varchar(255)      NOT NULL,
+					`lastName`      varchar(255)       NOT NULL,
+					`email`      varchar(255)       NOT NULL,
+					PRIMARY KEY (`id`)
+					)
+				ENGINE =InnoDB
+				AUTO_INCREMENT =0
+				DEFAULT CHARSET =utf8;";
+		$query = $this->db->prepare($sql);
+		$query->execute();
+	}
 
-        // useful for debugging: you can see the SQL behind above construction by using:
-        // echo '[ PDO DEBUG ]: ' . Helper::debugPDO($sql, $parameters);  exit();
+	/**
+	 * Returns a string in camelCase
+	 *
+	 * @param $string
+	 *
+	 * @return mixed|string
+	 */
+	private function camelCase($string)
+	{
+		// Process any already camel cased strings, while avoiding all caps words/acronyms
+		$str = preg_replace('/^\b([A-Z])/', ' $1', $string);
+		// Make sure that all words are upper case, but other letters lower
+		$str = ucwords(strtolower($str));
+		// Remove any duplicate whitespace, and ensure all characters are alphanumeric
+		$str = preg_replace('/[^A-Za-z0-9]/', '', $str);
+		// Trim whitespace and lower case first String
+		$str = trim(lcfirst($str));
 
-        $query->execute($parameters);
-    }
+		return $str;
+	}
 
-    /**
-     * Delete a song in the database
-     * Please note: this is just an example! In a real application you would not simply let everybody
-     * add/update/delete stuff!
-     * @param int $song_id Id of song
-     */
-    public function deleteSong($song_id)
-    {
-        $sql = "DELETE FROM song WHERE id = :song_id";
-        $query = $this->db->prepare($sql);
-        $parameters = array(':song_id' => $song_id);
+	/**
+	 * Deletes a record
+	 *
+	 * @param $id
+	 */
+	private function deleteRow($id)
+	{
+		$sql        = "DELETE FROM tmp WHERE id = :id";
+		$query      = $this->db->prepare($sql);
+		$parameters = array(':id' => $id);
 
-        // useful for debugging: you can see the SQL behind above construction by using:
-        // echo '[ PDO DEBUG ]: ' . Helper::debugPDO($sql, $parameters);  exit();
+		// useful for debugging: you can see the SQL behind above construction by using:
+		// echo '[ PDO DEBUG ]: ' . Helper::debugPDO($sql, $parameters);  exit();
 
-        $query->execute($parameters);
-    }
+		$query->execute($parameters);
+	}
 
-    /**
-     * Get a song from database
-     */
-    public function getSong($song_id)
-    {
-        $sql = "SELECT id, artist, track, link FROM song WHERE id = :song_id LIMIT 1";
-        $query = $this->db->prepare($sql);
-        $parameters = array(':song_id' => $song_id);
+	/**
+	 * Returns all of the records in the tmp table
+	 *
+	 * @return mixed
+	 */
+	private function getAllRecords()
+	{
+		$sql   = "SELECT id, firstName, lastName, email FROM tmp";
+		$query = $this->db->prepare($sql);
+		$query->execute();
 
-        // useful for debugging: you can see the SQL behind above construction by using:
-        // echo '[ PDO DEBUG ]: ' . Helper::debugPDO($sql, $parameters);  exit();
+		return $query->fetchAll();
+	}
 
-        $query->execute($parameters);
+	/**
+	 * Returns an array of data from a CSV file
+	 *
+	 * @param $file
+	 *
+	 * @return array
+	 */
+	private function getCsvData($file)
+	{
+		return array_map('str_getcsv', file($file));
+	}
 
-        // fetch() is the PDO method that get exactly one result
-        return $query->fetch();
-    }
+	/**
+	 * Read the first row of a CSV to create a name based mapping of column values
+	 *
+	 * @param $csvfile
+	 *
+	 * @return mixed
+	 */
+	private function mapColumnNames($csvfile)
+	{
+		$return = new stdClass;
 
-    /**
-     * Update a song in database
-     * // TODO put this explaination into readme and remove it from here
-     * Please note that it's not necessary to "clean" our input in any way. With PDO all input is escaped properly
-     * automatically. We also don't use strip_tags() etc. here so we keep the input 100% original (so it's possible
-     * to save HTML and JS to the database, which is a valid use case). Data will only be cleaned when putting it out
-     * in the views (see the views for more info).
-     * @param string $artist Artist
-     * @param string $track Track
-     * @param string $link Link
-     * @param int $song_id Id
-     */
-    public function updateSong($artist, $track, $link, $song_id)
-    {
-        $sql = "UPDATE song SET artist = :artist, track = :track, link = :link WHERE id = :song_id";
-        $query = $this->db->prepare($sql);
-        $parameters = array(':artist' => $artist, ':track' => $track, ':link' => $link, ':song_id' => $song_id);
+		foreach ($csvfile[0] as $key => $value)
+		{
+			$return->{$this->camelCase($value)} = $key;
+		}
 
-        // useful for debugging: you can see the SQL behind above construction by using:
-        // echo '[ PDO DEBUG ]: ' . Helper::debugPDO($sql, $parameters);  exit();
+		return $return;
+	}
 
-        $query->execute($parameters);
-    }
+	/**
+	 * Parses and formats data in the CSV file
+	 *
+	 * @param $file
+	 *
+	 * @return mixed
+	 */
+	public function parseCSV($file)
+	{
+		$rows            = $this->getCsvData($file);
+		$this->columnMap = $this->mapColumnNames($rows);
 
-    /**
-     * Get simple "stats". This is just a simple demo to show
-     * how to use more than one model in a controller (see application/controller/songs.php for more)
-     */
-    public function getAmountOfSongs()
-    {
-        $sql = "SELECT COUNT(id) AS amount_of_songs FROM song";
-        $query = $this->db->prepare($sql);
-        $query->execute();
+		// Remove header row
+		array_shift($rows);
 
-        // fetch() is the PDO method that get exactly one result
-        return $query->fetch()->amount_of_songs;
-    }
+		foreach ($rows as $key => $row)
+		{
+			$name  = $this->splitName($row[$this->columnMap->fullname]);
+			$email = strtolower($row[$this->columnMap->email]);
+
+			$return[$key]['firstName'] = $name->firstName;
+			$return[$key]['lastName']  = $name->lastName;
+			$return[$key]['email']     = $email;
+
+			$this->writeRecord($name->firstName, $name->lastName, $email);
+		}
+
+		return $return;
+	}
+
+	/**
+	 * Splits the persons name and formats the result
+	 *
+	 * @param $name
+	 *
+	 * @return stdClass
+	 */
+	private function splitName($name)
+	{
+		$parts = explode(',', $name);
+
+		$return            = new stdClass;
+		$return->firstName = ucfirst(strtolower(trim($parts[1])));
+		$return->lastName  = ucfirst(strtolower(trim($parts[0])));
+
+		return $return;
+	}
+
+	/**
+	 * Forces a CSV file download and deletes tmp records
+	 */
+	public function writeCSV()
+	{
+
+		$data = $this->getAllRecords();
+
+		header("Content-Type: text/csv");
+		header("Content-Disposition: attachment; filename=file.csv");
+		// Disable caching
+		header("Cache-Control: no-cache, no-store, must-revalidate"); // HTTP 1.1
+		header("Pragma: no-cache"); // HTTP 1.0
+		header("Expires: 0"); // Proxies
+
+		// create a file pointer connected to the output stream
+		$output = fopen("php://output", "w");
+
+		foreach ($data[0] as $name => $value)
+		{
+			$header[] = $name;
+		}
+
+		// output the column headings
+		fputcsv($output, (array) $header);
+
+		foreach ($data as $row)
+		{
+			fputcsv($output, (array) $row);
+
+			// Delete record from tmp table
+			$this->deleteRow($row->id);
+		}
+
+		fclose($output);
+	}
+
+	/**
+	 * Writes a record to the database
+	 *
+	 * @param $firstName
+	 * @param $lastName
+	 * @param $email
+	 */
+	private function writeRecord($firstName, $lastName, $email)
+	{
+		$sql        = "INSERT into tmp (firstName, lastName, email) VALUES (:firstName, :lastName, :email)";
+		$query      = $this->db->prepare($sql);
+		$parameters = array(':firstName' => $firstName, ':lastName' => $lastName, ':email' => $email);
+
+		// useful for debugging: you can see the SQL behind above construction by using:
+		// echo '[ PDO DEBUG ]: ' . Helper::debugPDO($sql, $parameters);  exit();
+
+		$query->execute($parameters);
+	}
 }
