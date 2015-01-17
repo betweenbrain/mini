@@ -40,5 +40,8 @@ class Import extends Controller
 	public function export()
 	{
 		$this->model->writeCSV($this->data);
+
+		header('location: ' . URL . 'import/index');
+
 	}
 }
