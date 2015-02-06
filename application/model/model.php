@@ -31,6 +31,8 @@ class Model
 					`firstName`         varchar(255)      NOT NULL,
 					`lastName`      varchar(255)       NOT NULL,
 					`email`      varchar(255)       NOT NULL,
+					`firstDate`      varchar(255)       NOT NULL,
+					`lastDate`      varchar(255)       NOT NULL,
 					PRIMARY KEY (`id`)
 					)
 				ENGINE =InnoDB
@@ -85,7 +87,7 @@ class Model
 	 */
 	private function getAllRecords()
 	{
-		$sql   = "SELECT id, firstName, lastName, email FROM tmp";
+		$sql   = "SELECT id, firstName, lastName, email, firstDate, lastDate FROM tmp";
 		$query = $this->db->prepare($sql);
 		$query->execute();
 
@@ -140,16 +142,22 @@ class Model
 
 		foreach ($rows as $key => $row)
 		{
+
 			$email = strtolower($row[$this->columnMap->email]);
 
 			$firstName = ucfirst(strtolower($row[$this->columnMap->firstname]));
 			$lastName  = ucfirst(strtolower($row[$this->columnMap->lastname]));
 
+			$firstDate = $row[$this->columnMap->firstdate];
+			$lastDate  = $row[$this->columnMap->lastdate];
+
 			$return[$key]['firstName'] = $firstName;
 			$return[$key]['lastName']  = $lastName;
 			$return[$key]['email']     = $email;
+			$return[$key]['firstDate'] = $firstDate;
+			$return[$key]['lastDate']  = $lastDate;
 
-			$this->writeRecord($firstName, $lastName, $email);
+			$this->writeRecord($firstName, $lastName, $email, $firstDate, $lastDate);
 		}
 
 		return $return;
@@ -218,11 +226,11 @@ class Model
 	 * @param $lastName
 	 * @param $email
 	 */
-	private function writeRecord($firstName, $lastName, $email)
+	private function writeRecord($firstName, $lastName, $email, $firstDate, $lastDate)
 	{
-		$sql        = "INSERT into tmp (firstName, lastName, email) VALUES (:firstName, :lastName, :email)";
+		$sql        = "INSERT into tmp (firstName, lastName, email, firstDate, lastDate) VALUES (:firstName, :lastName, :email, :firstDate, :lastDate)";
 		$query      = $this->db->prepare($sql);
-		$parameters = array(':firstName' => $firstName, ':lastName' => $lastName, ':email' => $email);
+		$parameters = array(':firstName' => $firstName, ':lastName' => $lastName, ':email' => $email, ':firstDate' => $firstDate, ':lastDate' => $lastDate);
 
 		// useful for debugging: you can see the SQL behind above construction by using:
 		// echo '[ PDO DEBUG ]: ' . Helper::debugPDO($sql, $parameters);  exit();
