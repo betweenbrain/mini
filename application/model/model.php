@@ -140,14 +140,16 @@ class Model
 
 		foreach ($rows as $key => $row)
 		{
-			$name  = $this->splitName($row[$this->columnMap->fullname]);
 			$email = strtolower($row[$this->columnMap->email]);
 
-			$return[$key]['firstName'] = $name->firstName;
-			$return[$key]['lastName']  = $name->lastName;
+			$firstName = ucfirst(strtolower($row[$this->columnMap->firstname]));
+			$lastName  = ucfirst(strtolower($row[$this->columnMap->lastname]));
+
+			$return[$key]['firstName'] = $firstName;
+			$return[$key]['lastName']  = $lastName;
 			$return[$key]['email']     = $email;
 
-			$this->writeRecord($name->firstName, $name->lastName, $email);
+			$this->writeRecord($firstName, $lastName, $email);
 		}
 
 		return $return;
